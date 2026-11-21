@@ -1,0 +1,153 @@
+import { User } from "../models/User.js";
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, } from "../utils/jwt.js";
+import { logger } from "../utils/logger.js";
+// Password validation helper
+function validatePassword(password) {
+    if (!password || password.length < 8) {
+        return { isValid: false, error: "Password must be at least 8 characters long" };
+    }
+    if (!/[A-Z]/.test(password)) {
+        return { isValid: false, error: "Password must contain at least one uppercase letter" };
+    }
+    if (!/[a-z]/.test(password)) {
+        return { isValid: false, error: "Password must contain at least one lowercase letter" };
+    }
+    if (!/[0-9]/.test(password)) {
+        return { isValid: false, error: "Password must contain at least one number" };
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+        return { isValid: false, error: "Password must contain at least one special character (!@#$%^&*)" };
+    }
+    return { isValid: true };
+}
+class AuthService {
+    async register(data) {
+        try {
+            // Validate password strength
+            const passwordValidation = validatePassword(data.password);
+            if (!passwordValidation.isValid) {
+                throw new Error(passwordValidation.error);
+            }
+            // Check if user already exists
+            const existingUser = await User.findOne({
+                $or: [{ email: data.email }, { username: data.username }],
+            });
+            if (existingUser) {
+                throw new Error("User with this email or username already exists");
+            }
+            // Create new user
+            const user = new User({
+                email: data.email,
+                username: data.username,
+                password: data.password,
+                firstName: data.firstName,
+                lastName: data.lastName,
+            });
+            await user.save();
+            // Generate tokens
+            const accessToken = generateAccessToken({
+                userId: user._id.toString(),
+                email: user.email,
+            });
+            const refreshToken = generateRefreshToken({
+                userId: user._id.toString(),
+                email: user.email,
+            });
+            logger.info(`User registered: ${user.email}`);
+            return {
+                token: accessToken,
+                refreshToken,
+                user: this.formatUser(user),
+            };
+        }
+        catch (error) {
+            logger.error(`Registration failed: ${error}`);
+            throw error;
+        }
+    }
+    async login(data) {
+        try {
+            // Find user by email
+            const user = await User.findOne({ email: data.email }).select("+password");
+            if (!user) {
+                throw new Error("Invalid email or password");
+            }
+            // Compare password
+            const isPasswordValid = await user.comparePassword(data.password);
+            if (!isPasswordValid) {
+                throw new Error("Invalid email or password");
+            }
+            // Generate tokens
+            const accessToken = generateAccessToken({
+                userId: user._id.toString(),
+                email: user.email,
+            });
+            const refreshToken = generateRefreshToken({
+                userId: user._id.toString(),
+                email: user.email,
+            });
+            logger.info(`User logged in: ${user.email}`);
+            return {
+                token: accessToken,
+                refreshToken,
+                user: this.formatUser(user),
+            };
+        }
+        catch (error) {
+            logger.error(`Login failed: ${error}`);
+            throw error;
+        }
+    }
+    async refreshAccessToken(refreshToken) {
+        try {
+            const payload = verifyRefreshToken(refreshToken);
+            if (!payload) {
+                throw new Error("Invalid refresh token");
+            }
+            const user = await User.findById(payload.userId);
+            if (!user) {
+                throw new Error("User not found");
+            }
+            const newAccessToken = generateAccessToken({
+                userId: user._id.toString(),
+                email: user.email,
+            });
+            return {
+                token: newAccessToken,
+                user: this.formatUser(user),
+            };
+        }
+        catch (error) {
+            logger.error(`Token refresh failed: ${error}`);
+            throw error;
+        }
+    }
+    async getUserById(userId) {
+        try {
+            const user = await User.findById(userId);
+            if (!user) {
+                throw new Error("User not found");
+            }
+            return this.formatUser(user);
+        }
+        catch (error) {
+            logger.error(`Failed to get user: ${error}`);
+            throw error;
+        }
+    }
+    formatUser(user) {
+        return {
+            _id: user._id,
+            email: user.email,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            avatar: user.avatar,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            preferences: user.preferences,
+            stats: user.stats,
+        };
+    }
+}
+export const authService = new AuthService();

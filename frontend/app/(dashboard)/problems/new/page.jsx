@@ -1,0 +1,226 @@
+'use client';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { toDateString } from '@/utils/dates';
+import { useProblemsStore } from '@/store/problems';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { ProblemApproachesSection, } from '@/components/problems/ProblemApproachesSection';
+const PLATFORMS = ['LeetCode', 'Codeforces', 'HackerRank', 'CodeChef', 'AtCoder', 'Other'];
+const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+const TOPICS = ['Array', 'String', 'Hash Table', 'Linked List', 'Tree', 'Graph', 'DP', 'Greedy', 'Math', 'Binary Search', 'Stack', 'Queue', 'Heap', 'Trie', 'Backtracking'];
+export default function AddProblemPage() {
+    const router = useRouter();
+    const { createProblem, isLoading } = useProblemsStore();
+    const [formData, setFormData] = useState({
+        title: '',
+        platform: 'LeetCode',
+        difficulty: 'Medium',
+        topics: [],
+        problemLink: '',
+        dateSolved: toDateString(new Date()),
+        timeTaken: 0,
+        keyIntuition: '',
+        notes: '',
+        mistakesMade: [],
+        edgeCases: [],
+        approaches: {
+            bruteForceSolution: {
+                description: '',
+                timeComplexity: '',
+                spaceComplexity: '',
+            },
+            optimizedSolution: {
+                description: '',
+                timeComplexity: '',
+                spaceComplexity: '',
+                keyInsight: '',
+            },
+        },
+        codeSnippets: [],
+    });
+    const [mistakeInput, setMistakeInput] = useState('');
+    const [edgeCaseInput, setEdgeCaseInput] = useState('');
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: name === 'timeTaken' ? parseInt(value) || 0 : value,
+        }));
+    };
+    const toggleTopic = (topic) => {
+        setFormData(prev => ({
+            ...prev,
+            topics: prev.topics.includes(topic)
+                ? prev.topics.filter(t => t !== topic)
+                : [...prev.topics, topic],
+        }));
+    };
+    const addMistake = () => {
+        if (mistakeInput.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                mistakesMade: [...prev.mistakesMade, mistakeInput],
+            }));
+            setMistakeInput('');
+        }
+    };
+    const removeMistake = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            mistakesMade: prev.mistakesMade.filter((_, i) => i !== index),
+        }));
+    };
+    const addEdgeCase = () => {
+        if (edgeCaseInput.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                edgeCases: [...prev.edgeCases, edgeCaseInput],
+            }));
+            setEdgeCaseInput('');
+        }
+    };
+    const removeEdgeCase = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            edgeCases: prev.edgeCases.filter((_, i) => i !== index),
+        }));
+    };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.title.trim()) {
+            toast.error('Title is required');
+            return;
+        }
+        if (formData.topics.length === 0) {
+            toast.error('Select at least one topic');
+            return;
+        }
+        try {
+            await createProblem({
+                ...formData,
+                approaches: formData.approaches,
+                codeSnippets: formData.codeSnippets.filter((s) => s.code.trim()),
+            });
+            toast.success('Problem added successfully!');
+            router.push('/problems');
+        }
+        catch (error) {
+            toast.error(error?.response?.data?.message || 'Failed to create problem');
+        }
+    };
+    return (<div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">Add New Problem</h1>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Track your coding problems and solutions</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-950 rounded-lg shadow-lg p-4 sm:p-6 lg:p-8 border border-gray-200 dark:border-gray-800 transition-colors duration-200">
+        {/* Basic Information */}
+        <div className="mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Basic Information</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <Input type="text" name="title" label="Problem Title" placeholder="e.g., Two Sum" value={formData.title} onChange={handleChange} required/>
+            
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Platform</label>
+              <select name="platform" value={formData.platform} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+                {PLATFORMS.map(p => (<option key={p} value={p}>{p}</option>))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Difficulty</label>
+              <select name="difficulty" value={formData.difficulty} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+                {DIFFICULTIES.map(d => (<option key={d} value={d}>{d}</option>))}
+              </select>
+            </div>
+
+            <Input type="date" name="dateSolved" label="Date Solved" value={formData.dateSolved} onChange={handleChange}/>
+          </div>
+        </div>
+
+        {/* Topics */}
+        <div className="mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Topics</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+            {TOPICS.map(topic => (<label key={topic} className="flex items-center cursor-pointer">
+                <input type="checkbox" checked={formData.topics.includes(topic)} onChange={() => toggleTopic(topic)} className="mr-2 w-4 h-4 accent-blue-500"/>
+                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">{topic}</span>
+              </label>))}
+          </div>
+        </div>
+
+        {/* Problem Details */}
+        <div className="mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Problem Details</h2>
+          <div className="space-y-6">
+            <Input type="url" name="problemLink" label="Problem Link (Optional)" placeholder="https://leetcode.com/problems/..." value={formData.problemLink} onChange={handleChange}/>
+
+            <Input type="number" name="timeTaken" label="Time Taken (minutes)" value={formData.timeTaken} onChange={handleChange} min="0"/>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Key Intuition</label>
+              <textarea name="keyIntuition" placeholder="What was the key insight for this problem?" value={formData.keyIntuition} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200" rows={3}/>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>
+              <textarea name="notes" placeholder="Any additional notes about the problem..." value={formData.notes} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200" rows={3}/>
+            </div>
+          </div>
+        </div>
+
+        <ProblemApproachesSection approaches={formData.approaches} onApproachesChange={(approaches) => setFormData((prev) => ({ ...prev, approaches }))} codeSnippets={formData.codeSnippets} onSnippetsChange={(codeSnippets) => setFormData((prev) => ({ ...prev, codeSnippets }))}/>
+
+        {/* Mistakes Made */}
+        <div className="mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Mistakes Made</h2>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 mb-4">
+            <input type="text" value={mistakeInput} onChange={(e) => setMistakeInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addMistake()} placeholder="Enter a mistake you made..." className="flex-1 border border-gray-300 dark:border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"/>
+            <Button variant="secondary" onClick={addMistake} type="button" size="sm">
+              Add
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {formData.mistakesMade.map((mistake, idx) => (<div key={idx} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 bg-red-50 dark:bg-red-950 dark:bg-opacity-30 p-3 rounded-lg border border-red-100 dark:border-red-900 transition-colors duration-200">
+                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 break-words">{mistake}</span>
+                <button onClick={() => removeMistake(idx)} type="button" className="text-xs sm:text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold transition-colors duration-200 self-start sm:self-auto">
+                  Remove
+                </button>
+              </div>))}
+          </div>
+        </div>
+
+        {/* Edge Cases */}
+        <div className="mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Edge Cases</h2>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 mb-4">
+            <input type="text" value={edgeCaseInput} onChange={(e) => setEdgeCaseInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addEdgeCase()} placeholder="Enter an edge case..." className="flex-1 border border-gray-300 dark:border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"/>
+            <Button variant="secondary" onClick={addEdgeCase} type="button" size="sm">
+              Add
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {formData.edgeCases.map((edgeCase, idx) => (<div key={idx} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 bg-purple-50 dark:bg-purple-950 dark:bg-opacity-30 p-3 rounded-lg border border-purple-100 dark:border-purple-900 transition-colors duration-200">
+                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 break-words">{edgeCase}</span>
+                <button onClick={() => removeEdgeCase(idx)} type="button" className="text-xs sm:text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold transition-colors duration-200 self-start sm:self-auto">
+                  Remove
+                </button>
+              </div>))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <Button type="submit" variant="primary" isLoading={isLoading} className="flex-1" size="md">
+            Save Problem
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => router.back()} size="md">
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>);
+}
